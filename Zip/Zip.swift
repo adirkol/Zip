@@ -97,7 +97,7 @@ public class Zip {
        - notes: Supports implicit progress composition.
        */
       
-      class func unzipInMemory(_ zipFilePath: URL, password: String?, fileOutputHandler: @escaping (_ unzippedData: Data, _ fileName: String) -> Void) throws {
+      public class func unzipInMemory(_ zipFilePath: URL, password: String?, fileOutputHandler: @escaping (_ unzippedData: Data, _ fileName: String) -> Void) throws {
           
           // File manager
           let fileManager = FileManager.default
