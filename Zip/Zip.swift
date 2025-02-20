@@ -82,6 +82,106 @@ public class Zip {
     
     // MARK: Unzip
     
+    // ADDED BY ADIR
+    // Taken from: https://github.com/marmelroy/Zip/issues/269#event-14331893915
+    /**
+       Unzip data in memory.
+
+       - parameter data: The Data object containing the zip file content.
+       - parameter password: An optional password string for encrypted zip files.
+       - parameter fileOutputHandler: A closure called for each unzipped file, providing the unzipped data and the file name.
+       - parameter progress: A progress closure called after unzipping each file in the archive, with a Double value between 0 and 1.
+
+       - throws: Error if unzipping fails.
+
+       - notes: Supports implicit progress composition.
+       */
+      
+      class func unzipInMemory(_ zipFilePath: URL, password: String?, fileOutputHandler: @escaping (_ unzippedData: Data, _ fileName: String) -> Void) throws {
+          
+          // File manager
+          let fileManager = FileManager.default
+          
+          // Check whether a zip file exists at path.
+          let path = zipFilePath.path
+          
+          guard fileManager.fileExists(atPath: path), !fileExtensionIsInvalid(zipFilePath.pathExtension) else {
+              print("File not found at path: \(path)")
+              throw ZipError.fileNotFound
+          }
+          
+          // Unzip setup
+          var ret: Int32 = 0
+          let bufferSize: UInt32 = 4096
+          var buffer = [CUnsignedChar](repeating: 0, count: Int(bufferSize))
+          
+          // Begin unzipping
+          let zip = unzOpen64(path)
+          defer { unzClose(zip) }
+          
+          if unzGoToFirstFile(zip) != UNZ_OK {
+              throw ZipError.unzipFail
+          }
+          
+          repeat {
+              var readBytes: Int32 = 0
+              
+              // Open the current file
+              if let cPassword = password?.cString(using: .ascii) {
+                  ret = unzOpenCurrentFilePassword(zip, cPassword)
+              } else {
+                  ret = unzOpenCurrentFile(zip)
+              }
+              
+              guard ret == UNZ_OK else {
+                  throw ZipError.unzipFail
+              }
+              
+              var fileInfo = unz_file_info64()
+              memset(&fileInfo, 0, MemoryLayout<unz_file_info>.size)
+              
+              ret = unzGetCurrentFileInfo64(zip, &fileInfo, nil, 0, nil, 0, nil, 0)
+              guard ret == UNZ_OK else {
+                  unzCloseCurrentFile(zip)
+                  throw ZipError.unzipFail
+              }
+              
+              let fileNameSize = Int(fileInfo.size_filename) + 1
+              let fileName = UnsafeMutablePointer<CChar>.allocate(capacity: fileNameSize)
+              defer { free(fileName) }
+              
+              unzGetCurrentFileInfo64(zip, &fileInfo, fileName, UInt(fileNameSize), nil, 0, nil, 0)
+              fileName[Int(fileInfo.size_filename)] = 0
+              
+              let pathString = String(cString: fileName)
+              var fileData = Data()
+
+              // Read file data
+              repeat {
+                  readBytes = unzReadCurrentFile(zip, &buffer, bufferSize)
+                  if readBytes > 0 {
+                      fileData.append(buffer, count: Int(readBytes))
+                  }
+              } while readBytes > 0
+              
+              // Close the current file
+              let crcRet = unzCloseCurrentFile(zip)
+              guard crcRet == UNZ_OK else {
+                  throw ZipError.unzipFail
+              }
+              
+              // Call the output handler with the unzipped data
+              fileOutputHandler(fileData, pathString)
+              
+              // Move to the next file
+              ret = unzGoToNextFile(zip)
+              
+          } while (ret == UNZ_OK)
+      }
+    
+    // END BY ADIR
+    
+    
     /**
      Unzip file
      
