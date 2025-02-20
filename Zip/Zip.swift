@@ -127,7 +127,7 @@ public class Zip {
               var readBytes: Int32 = 0
               
               // Open the current file
-              if let cPassword = password?.cString(using: .ascii) {
+              if let cPassword = password?.cString(using: .utf8) {
                   ret = unzOpenCurrentFilePassword(zip, cPassword)
               } else {
                   ret = unzOpenCurrentFile(zip)
